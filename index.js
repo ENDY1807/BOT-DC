@@ -64,7 +64,9 @@ client.on("messageCreate", async (message) => {
   // ====================
   // AI COMMAND
   // ====================
-  if (command === "ai") {
+  const fetch = require("node-fetch");
+
+if (command === "ai") {
 
   const question = args.join(" ");
 
@@ -74,32 +76,31 @@ client.on("messageCreate", async (message) => {
 
   try {
 
-    // search wikipedia
-    const searchUrl = `https://id.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(question)}&format=json`;
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          inputs: question
+        })
+      }
+    );
 
-    const searchRes = await fetch(searchUrl);
-    const searchData = await searchRes.json();
+    const data = await response.json();
 
-    if (!searchData.query.search.length) {
-      return message.reply("Tidak menemukan informasi.");
+    if (!data.generated_text) {
+      return message.reply("AI tidak bisa menjawab.");
     }
 
-    const title = searchData.query.search[0].title;
-
-    // ambil summary
-    const summaryUrl = `https://id.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
-
-    const summaryRes = await fetch(summaryUrl);
-    const data = await summaryRes.json();
-
-    const text = `📚 **${data.title}**\n\n${data.extract}\n\n${data.content_urls.desktop.page}`;
-
-    return message.reply(text.slice(0,1900));
+    return message.reply(data.generated_text.slice(0,1900));
 
   } catch (err) {
 
     console.log(err);
-    return message.reply("AI sedang error.");
+    return message.reply("AI error.");
 
   }
 
