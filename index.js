@@ -1,7 +1,7 @@
 const { Client, Intents } = require("discord.js");
 const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, StreamType } = require("@discordjs/voice");
-const fetch = require("node-fetch");
 const gtts = require("google-tts-api");
+const { Configuration, OpenAIApi } = require("openai");
 
 const client = new Client({
   intents: [
@@ -13,6 +13,9 @@ const client = new Client({
 });
 
 const prefix = ",";
+const openai = new OpenAIApi(new Configuration({
+  apiKey: process.env.OPENAI_API_KEY
+}));
 
 client.once("ready", () => {
   console.log(`Bot online sebagai ${client.user.tag}`);
@@ -69,25 +72,20 @@ client.on("messageCreate", async (message) => {
     if (!question) return message.reply("Masukkan pertanyaan.");
 
     try {
-      // Chat AI
-      const res = await fetch("https://api.affiliateplus.xyz/api/chatbot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: question,
-          botname: "VoiceAI",
-          ownername: "Endy",
-          user: message.author.id
-        })
+      // ====================
+      // AI RESPONSE
+      // ====================
+      const response = await openai.createChatCompletion({
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "user", content: question }]
       });
 
-      const data = await res.json();
-      if (!data.message) return message.reply("AI tidak bisa menjawab sekarang.");
-
-      const replyText = data.message.slice(0, 2000);
+      const replyText = response.data.choices[0].message.content.slice(0, 2000);
       message.reply(replyText);
 
-      // Text-to-Speech
+      // ====================
+      // TTS STREAM
+      // ====================
       const connection = getVoiceConnection(message.guild.id);
       if (connection) {
         const url = gtts.getAudioUrl(replyText, {
@@ -121,7 +119,6 @@ COMMAND BOT
 ,help → lihat command
 `);
   }
-
 });
 
 client.login(process.env.TOKEN);
