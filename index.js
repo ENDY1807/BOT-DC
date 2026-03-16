@@ -15,12 +15,10 @@ const client = new Client({
 
 const PREFIX = ",";
 
-// ================= READY =================
 client.once("ready", () => {
-  console.log(`🤖 Bot aktif sebagai ${client.user.tag}`);
+  console.log(`Bot aktif sebagai ${client.user.tag}`);
 });
 
-// ================= MESSAGE EVENT =================
 client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
@@ -29,44 +27,11 @@ client.on("messageCreate", async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // ================= HELP =================
-  if (command === "help") {
-
-    const helpText = `
-🤖 **AI Discord Bot Commands**
-
-,ai <pertanyaan>
-→ Tanya AI (Bahasa Indonesia)
-
-,ai-en <question>
-→ Tanya AI (English)
-
-,voice
-→ Bot join voice channel
-
-,leave
-→ Bot keluar voice
-
-,ping
-→ Cek apakah bot hidup
-`;
-
-    return message.reply(helpText);
-  }
-
-  // ================= PING =================
-  if (command === "ping") {
-    return message.reply(`🏓 Pong! ${client.ws.ping}ms`);
-  }
-
-  // ================= JOIN VOICE =================
+  // ================= VOICE JOIN =================
   if (command === "voice") {
 
     const vc = message.member.voice.channel;
-
-    if (!vc) {
-      return message.reply("Masuk voice channel dulu.");
-    }
+    if (!vc) return message.reply("Masuk voice channel dulu.");
 
     joinVoiceChannel({
       channelId: vc.id,
@@ -76,98 +41,62 @@ client.on("messageCreate", async (message) => {
       selfDeaf: false
     });
 
-    return message.reply(`🎧 Bot masuk ke voice: **${vc.name}**`);
+    return message.reply("Bot masuk voice.");
   }
 
-  // ================= LEAVE VOICE =================
+  // ================= VOICE LEAVE =================
   if (command === "leave") {
 
     const connection = getVoiceConnection(message.guild.id);
 
-    if (!connection) {
-      return message.reply("Bot tidak sedang di voice.");
-    }
+    if (!connection) return message.reply("Bot tidak di voice.");
 
     connection.destroy();
 
-    return message.reply("👋 Bot keluar dari voice.");
+    return message.reply("Bot keluar voice.");
   }
 
-  // ================= AI INDONESIA =================
+  // ================= AI =================
   if (command === "ai") {
 
     const question = args.join(" ");
 
-    if (!question) {
-      return message.reply("Tulis pertanyaan setelah `,ai`");
-    }
+    if (!question) return message.reply("Tulis pertanyaan setelah ,ai");
 
-    message.reply("🔎 AI sedang mencari jawaban...");
+    message.reply("🔎 AI mencari informasi...");
 
     try {
 
-      const url = `https://id.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(question)}`;
+      // cari topik di wikipedia
+      const search = await axios.get(
+        `https://id.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(question)}&format=json`
+      );
 
-      const res = await axios.get(url);
-
-      if (!res.data.extract) {
+      if (!search.data.query.search.length) {
         return message.reply("AI tidak menemukan informasi.");
       }
 
-      const answer =
-`📚 **${res.data.title}**
+      const title = search.data.query.search[0].title;
 
-${res.data.extract}`;
+      // ambil ringkasan
+      const summary = await axios.get(
+        `https://id.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`
+      );
 
-      return message.reply(answer);
+      const text = summary.data.extract;
 
-    } catch (err) {
-
-      console.log(err);
-
-      return message.reply("AI tidak menemukan jawaban untuk pertanyaan itu.");
-
-    }
-  }
-
-  // ================= AI ENGLISH =================
-  if (command === "ai-en") {
-
-    const question = args.join(" ");
-
-    if (!question) {
-      return message.reply("Write a question after `,ai-en`");
-    }
-
-    message.reply("🔎 AI searching...");
-
-    try {
-
-      const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(question)}`;
-
-      const res = await axios.get(url);
-
-      if (!res.data.extract) {
-        return message.reply("No information found.");
-      }
-
-      const answer =
-`📚 **${res.data.title}**
-
-${res.data.extract}`;
-
-      return message.reply(answer);
+      return message.reply(`📚 **${title}**\n\n${text}`);
 
     } catch (err) {
 
       console.log(err);
 
-      return message.reply("AI could not find the answer.");
+      return message.reply("AI gagal mengambil informasi.");
 
     }
+
   }
 
 });
 
-// ================= LOGIN =================
-client.login(process.env.TOKEN);
+client.login(process.env.DISCORD_TOKEN);
