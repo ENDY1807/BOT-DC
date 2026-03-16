@@ -66,35 +66,44 @@ client.on("messageCreate", async (message) => {
   // ====================
   if (command === "ai") {
 
-    const question = args.join(" ");
+  const question = args.join(" ");
 
-    if (!question) {
-      return message.reply("Masukkan pertanyaan.");
+  if (!question) {
+    return message.reply("Masukkan pertanyaan.");
+  }
+
+  try {
+
+    // search wikipedia
+    const searchUrl = `https://id.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(question)}&format=json`;
+
+    const searchRes = await fetch(searchUrl);
+    const searchData = await searchRes.json();
+
+    if (!searchData.query.search.length) {
+      return message.reply("Tidak menemukan informasi.");
     }
 
-    try {
+    const title = searchData.query.search[0].title;
 
-      const url = `https://id.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(question)}`;
+    // ambil summary
+    const summaryUrl = `https://id.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
 
-      const res = await fetch(url);
-      const data = await res.json();
+    const summaryRes = await fetch(summaryUrl);
+    const data = await summaryRes.json();
 
-      if (!data.extract) {
-        return message.reply("Tidak menemukan informasi.");
-      }
+    const text = `📚 **${data.title}**\n\n${data.extract}\n\n${data.content_urls.desktop.page}`;
 
-      const text = `📚 **${data.title}**\n\n${data.extract}\n\n${data.content_urls.desktop.page}`;
+    return message.reply(text.slice(0,1900));
 
-      return message.reply(text.slice(0,1900));
+  } catch (err) {
 
-    } catch (err) {
-
-      console.log(err);
-      return message.reply("AI sedang error.");
-
-    }
+    console.log(err);
+    return message.reply("AI sedang error.");
 
   }
+
+}
 
   // ====================
   // HELP
