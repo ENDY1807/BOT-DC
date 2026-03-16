@@ -1,14 +1,9 @@
-require("dotenv").config();
-const { Client, GatewayIntentBits } = require("discord.js");
-const {
-  joinVoiceChannel,
-  getVoiceConnection,
-  createAudioPlayer,
-  createAudioResource,
-  StreamType
-} = require("@discordjs/voice");
-const fetch = require("node-fetch");
-const gtts = require("google-tts-api");
+require('dotenv').config();
+const { Client, GatewayIntentBits } = require('discord.js');
+const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
+const googleIt = require('google-it');
+const axios = require('axios');
+const cheerio = require('cheerio');
 
 const client = new Client({
   intents: [
@@ -19,95 +14,76 @@ const client = new Client({
   ]
 });
 
-const prefix = ",";
-const OPENAI_KEY = process.env.OPENAI_KEY;
+const PREFIX = process.env.PREFIX || "!";
 
-client.once("ready", () => {
-  console.log(`Bot online sebagai ${client.user.tag}`);
+client.on('ready', () => {
+  console.log(`Bot aktif sebagai ${client.user.tag}`);
 });
 
-client.on("messageCreate", async (message) => {
+// Command handler
+client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
-  if (!message.content.startsWith(prefix)) return;
+  if (!message.content.startsWith(PREFIX)) return;
 
-  const args = message.content.slice(prefix.length).trim().split(" ");
+  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
+  // ===== Voice join/afk =====
   if (command === "voice") {
-    if (!message.member.voice.channel) return message.reply("Masuk voice dulu.");
-    const channel = message.member.voice.channel;
-
+    const vc = message.member.voice.channel;
+    if (!vc) return message.reply("Kamu harus berada di voice channel dulu!");
     joinVoiceChannel({
-      channelId: channel.id,
-      guildId: channel.guild.id,
-      adapterCreator: channel.guild.voiceAdapterCreator,
-      selfDeaf: false
+      channelId: vc.id,
+      guildId: vc.guild.id,
+      adapterCreator: vc.guild.voiceAdapterCreator,
+      selfDeaf: false,
+      selfMute: true // AFK mode
     });
-
-    return message.reply("Bot join voice!");
+    message.reply(`Berhasil join voice channel: **${vc.name}** (AFK mode)`);
   }
 
+  // ===== Leave voice =====
   if (command === "leave") {
     const connection = getVoiceConnection(message.guild.id);
-    if (!connection) return message.reply("Bot tidak ada di voice.");
+    if (!connection) return message.reply("Bot tidak sedang berada di voice channel!");
     connection.destroy();
-    return message.reply("Bot keluar dari voice.");
+    message.reply("Bot telah keluar dari voice channel.");
   }
 
+  // ===== AI chat =====
   if (command === "ai") {
-    const question = args.join(" ");
-    if (!question) return message.reply("Masukkan pertanyaan.");
+    const query = args.join(" ");
+    if (!query) return message.reply("Tolong tulis pertanyaanmu!");
+
+    message.channel.send(`Mencari jawaban untuk: **${query}** ...`);
 
     try {
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${OPENAI_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "gpt-3.5-turbo",
-          messages: [
-            { role: "system", content: "Kamu asisten ramah, jawab pakai bahasa Indonesia." },
-            { role: "user", content: question }
-          ]
-        })
-      });
+      // Cari hasil dari Google
+      const results = await googleIt({ query, limit: 3 });
 
-      const data = await res.json();
-      const replyText = data.choices[0].message.content;
-      await message.reply(replyText);
+      let replyText = "";
+      for (let i = 0; i < results.length; i++) {
+        const link = results[i].link;
 
-      const connection = getVoiceConnection(message.guild.id);
-      if (connection) {
-        const url = gtts.getAudioUrl(replyText, {
-          lang: "id",
-          slow: false,
-          host: "https://translate.google.com"
-        });
-
-        const player = createAudioPlayer();
-        const resource = createAudioResource(url, {
-          inputType: StreamType.Arbitrary
-        });
-
-        player.play(resource);
-        connection.subscribe(player);
+        try {
+          const { data } = await axios.get(link);
+          const $ = cheerio.load(data);
+          const text = $("p").first().text();
+          if (text) {
+            replyText += `**Sumber:** ${link}\n**Info:** ${text}\n\n`;
+          }
+        } catch (err) {
+          replyText += `**Sumber:** ${link}\n**Info:** Tidak bisa diambil.\n\n`;
+        }
       }
+
+      if (!replyText) replyText = "Maaf, tidak menemukan jawaban yang jelas.";
+      message.reply(replyText);
+
     } catch (err) {
       console.error(err);
-      message.reply("AI error atau voice gagal diputar.");
+      message.reply("Ada error saat mencari jawaban.");
     }
-  }
-
-  if (command === "help") {
-    return message.reply(`
-COMMAND BOT
-,voice → join voice
-,leave → keluar voice
-,ai <pertanyaan> → chat AI & bacain
-,help → lihat command
-`);
   }
 });
 
