@@ -1,4 +1,3 @@
-// Ambil env dari hosting
 const TOKEN = process.env.TOKEN;
 const OPENAI_KEY = process.env.OPENAI_KEY;
 
@@ -11,15 +10,7 @@ const {
   StreamType
 } = require("@discordjs/voice");
 const fetch = require("node-fetch");
-const gtts = require("google-tts-api"); // versi stabil, tanpa gtts asli
-
-const { Configuration, OpenAIApi } = require("openai");
-
-// Setup OpenAI
-const configuration = new Configuration({
-  apiKey: OPENAI_KEY
-});
-const openai = new OpenAIApi(configuration);
+const gtts = require("google-tts-api");
 
 const client = new Client({
   intents: [
@@ -36,9 +27,6 @@ client.once("ready", () => {
   console.log(`Bot online sebagai ${client.user.tag}`);
 });
 
-// ====================
-// MESSAGE HANDLER
-// ====================
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(prefix)) return;
@@ -46,70 +34,55 @@ client.on("messageCreate", async (message) => {
   const args = message.content.slice(prefix.length).trim().split(" ");
   const command = args.shift().toLowerCase();
 
-  // ====================
-  // JOIN VOICE
-  // ====================
   if (command === "voice") {
     if (!message.member.voice.channel) return message.reply("Masuk voice dulu.");
     const channel = message.member.voice.channel;
 
-    try {
-      joinVoiceChannel({
-        channelId: channel.id,
-        guildId: channel.guild.id,
-        adapterCreator: channel.guild.voiceAdapterCreator,
-        selfDeaf: false
-      });
-      return message.reply("Bot masuk ke voice dan stay di channel!");
-    } catch (err) {
-      console.log(err);
-      return message.reply("Gagal join voice.");
-    }
+    joinVoiceChannel({
+      channelId: channel.id,
+      guildId: channel.guild.id,
+      adapterCreator: channel.guild.voiceAdapterCreator,
+      selfDeaf: false
+    });
+
+    return message.reply("Bot join voice!");
   }
 
-  // ====================
-  // LEAVE VOICE
-  // ====================
   if (command === "leave") {
     const connection = getVoiceConnection(message.guild.id);
     if (!connection) return message.reply("Bot tidak ada di voice.");
-    try {
-      connection.destroy();
-      return message.reply("Bot keluar dari voice.");
-    } catch (err) {
-      console.log(err);
-      return message.reply("Gagal keluar voice.");
-    }
+    connection.destroy();
+    return message.reply("Bot keluar dari voice.");
   }
 
-  // ====================
-  // AI CHAT
-  // ====================
   if (command === "ai") {
     const question = args.join(" ");
     if (!question) return message.reply("Masukkan pertanyaan.");
 
     try {
-      // ====================
-      // CHAT AI OPENAI
-      // ====================
-      const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          { role: "system", content: "Kamu adalah asisten yang ramah dan membalas dengan bahasa Indonesia." },
-          { role: "user", content: question }
-        ]
+      // Request ke OpenAI via fetch
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENAI_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo",
+          messages: [
+            { role: "system", content: "Kamu adalah asisten yang ramah dan membalas dengan bahasa Indonesia." },
+            { role: "user", content: question }
+          ]
+        })
       });
 
-      const replyText = response.choices[0].message.content;
+      const data = await res.json();
+      const replyText = data.choices[0].message.content;
       await message.reply(replyText);
 
-      // ====================
-      // TEXT-TO-SPEECH
-      // ====================
+      // Play voice
       const connection = getVoiceConnection(message.guild.id);
       if (connection) {
-        // Buat URL TTS dari google-tts-api
         const url = gtts.getAudioUrl(replyText, {
           lang: "id",
           slow: false,
@@ -124,22 +97,19 @@ client.on("messageCreate", async (message) => {
         player.play(resource);
         connection.subscribe(player);
       }
+
     } catch (err) {
       console.log(err);
       message.reply("AI error atau voice gagal diputar.");
     }
   }
 
-  // ====================
-  // HELP
-  // ====================
   if (command === "help") {
     return message.reply(`
 COMMAND BOT
-
-,voice → bot join voice dan stay
-,leave → bot keluar voice
-,ai <pertanyaan> → chat AI & bot bacain di voice
+,voice → join voice
+,leave → keluar voice
+,ai <pertanyaan> → chat AI & bacain
 ,help → lihat command
 `);
   }
