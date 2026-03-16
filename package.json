@@ -1,18 +1,6 @@
-{
-  "name": "voice-ai-bot",
-  "version": "1.0.0",
-  "description": "Bot Discord AI dengan voice & TTS",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "discord.js": "^14.25.1",
-    "@discordjs/voice": "^0.19.1",
-    "node-fetch": "^2.6.7",
-    "gtts": "^2.0.0"
-  },
-  "engines": {
-    "node": ">=16.9.0"
-  }
+"dependencies": {
+  "discord.js": "^14.25.1",
+  "@discordjs/voice": "^0.19.1",
+  "node-fetch": "^2.6.7",
+  "gtts": "^1.1.0"
 }
