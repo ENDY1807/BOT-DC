@@ -1,5 +1,5 @@
-const { Client, GatewayIntentBits } = require('discord.js');
-const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
+const { Client, GatewayIntentBits } = require("discord.js");
+const { joinVoiceChannel, getVoiceConnection } = require("@discordjs/voice");
 const OpenAI = require("openai");
 
 const openai = new OpenAI({
@@ -15,19 +15,27 @@ const client = new Client({
   ]
 });
 
-client.on("ready", () => {
+const prefix = ",";
+
+client.once("ready", () => {
   console.log(`Bot online sebagai ${client.user.tag}`);
 });
 
 client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
+  if (!message.content.startsWith(prefix)) return;
 
-  // COMMAND VOICE
-  if (message.content === ",voice") {
+  const args = message.content.slice(prefix.length).trim().split(" ");
+  const command = args.shift().toLowerCase();
+
+  // ====================
+  // JOIN VOICE
+  // ====================
+  if (command === "voice") {
 
     if (!message.member.voice.channel) {
-      return message.reply("Masuk voice dulu sebelum pakai bot.");
+      return message.reply("Masuk voice dulu.");
     }
 
     const channel = message.member.voice.channel;
@@ -35,47 +43,79 @@ client.on("messageCreate", async (message) => {
     joinVoiceChannel({
       channelId: channel.id,
       guildId: channel.guild.id,
-      adapterCreator: channel.guild.voiceAdapterCreator,
-      selfDeaf: true,
-      selfMute: true
+      adapterCreator: channel.guild.voiceAdapterCreator
     });
 
-    return message.reply("Bot masuk voice dan AFK.");
+    message.reply("Bot masuk ke voice.");
   }
 
-  // COMMAND LEAVE
-  if (message.content === ",leave") {
+  // ====================
+  // LEAVE VOICE
+  // ====================
+  if (command === "leave") {
+
     const connection = getVoiceConnection(message.guild.id);
 
-    if (!connection) return message.reply("Bot tidak ada di voice.");
+    if (!connection) {
+      return message.reply("Bot tidak ada di voice.");
+    }
 
     connection.destroy();
-    return message.reply("Bot keluar dari voice.");
+
+    message.reply("Bot keluar dari voice.");
   }
 
-  // AI CHAT
-  if (message.content.startsWith(",ai ")) {
+  // ====================
+  // AI COMMAND
+  // ====================
+  if (command === "ai") {
 
-    const question = message.content.slice(4);
+    const question = args.join(" ");
+
+    if (!question) {
+      return message.reply("Masukkan pertanyaan.");
+    }
 
     try {
 
-      const response = await openai.chat.completions.create({
+      const completion = await openai.chat.completions.create({
         model: "gpt-4.1-mini",
         messages: [
-          { role: "system", content: "Kamu adalah AI Discord yang membantu menjawab pertanyaan user." },
-          { role: "user", content: question }
+          {
+            role: "system",
+            content: "Kamu adalah AI Discord yang membantu user dengan jawaban yang jelas."
+          },
+          {
+            role: "user",
+            content: question
+          }
         ]
       });
 
-      const answer = response.choices[0].message.content;
+      const answer = completion.choices[0].message.content;
 
-      message.reply(answer);
+      message.reply(answer.slice(0, 1900));
 
-    } catch (error) {
-      console.error(error);
-      message.reply("AI sedang error.");
+    } catch (err) {
+      console.error(err);
+      message.reply("AI error.");
     }
+
+  }
+
+  // ====================
+  // HELP COMMAND
+  // ====================
+  if (command === "help") {
+
+    message.reply(`
+COMMAND BOT:
+
+,voice → bot masuk voice
+,leave → bot keluar voice
+,ai <pertanyaan> → tanya AI
+,help → lihat command
+`);
 
   }
 
