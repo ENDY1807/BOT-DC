@@ -9,11 +9,11 @@
     "node": ">=18"
   },
   "dependencies": {
-    "discord.js": "^14.25.1",
-    "@discordjs/voice": "^0.19.1",
-    "axios": "^1.6.0",
-    "cheerio": "^1.0.0",
-    "google-it": "^1.6.0",
-    "dotenv": "^16.3.1"
+    "discord.js": "14.13.0",
+    "@discordjs/voice": "0.16.0",
+    "axios": "1.6.7",
+    "cheerio": "1.0.0-rc.12",
+    "google-it": "1.6.2",
+    "dotenv": "16.3.1"
   }
 }
