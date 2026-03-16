@@ -1,3 +1,5 @@
+require('web-streams-polyfill/ponyfill'); // polyfill ReadableStream untuk Node 16
+
 const { Client, GatewayIntentBits } = require("discord.js");
 const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, StreamType } = require("@discordjs/voice");
 const fetch = require("node-fetch");
@@ -19,7 +21,6 @@ client.once("ready", () => {
 });
 
 client.on("messageCreate", async (message) => {
-
   if (message.author.bot) return;
   if (!message.content.startsWith(prefix)) return;
 
@@ -95,7 +96,7 @@ client.on("messageCreate", async (message) => {
         const url = gtts.getAudioUrl(replyText, {
           lang: 'id',
           slow: false,
-          host: 'https://translate.google.com',
+          host: 'https://translate.google.com'
         });
 
         const player = createAudioPlayer();
