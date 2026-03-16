@@ -1,7 +1,7 @@
 const { Client, GatewayIntentBits } = require("discord.js");
-const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType } = require("@discordjs/voice");
+const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, StreamType } = require("@discordjs/voice");
 const fetch = require("node-fetch");
-const gTTS = require("gtts"); // npm install gtts
+const gtts = require("google-tts-api");
 
 const client = new Client({
   intents: [
@@ -18,9 +18,6 @@ client.once("ready", () => {
   console.log(`Bot online sebagai ${client.user.tag}`);
 });
 
-// ====================
-// MESSAGE HANDLER
-// ====================
 client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
@@ -66,7 +63,7 @@ client.on("messageCreate", async (message) => {
   }
 
   // ====================
-  // AI CHAT
+  // AI CHAT + TTS
   // ====================
   if (command === "ai") {
     const question = args.join(" ");
@@ -95,14 +92,16 @@ client.on("messageCreate", async (message) => {
       // ====================
       const connection = getVoiceConnection(message.guild.id);
       if (connection) {
-        const tts = new gTTS(replyText, "id");
-        const path = `./tts-${Date.now()}.mp3`;
-        tts.save(path, () => {
-          const player = createAudioPlayer();
-          const resource = createAudioResource(path, { inputType: StreamType.Arbitrary });
-          player.play(resource);
-          connection.subscribe(player);
+        const url = gtts.getAudioUrl(replyText, {
+          lang: 'id',
+          slow: false,
+          host: 'https://translate.google.com',
         });
+
+        const player = createAudioPlayer();
+        const resource = createAudioResource(url, { inputType: StreamType.Arbitrary });
+        player.play(resource);
+        connection.subscribe(player);
       }
 
     } catch (err) {
