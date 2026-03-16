@@ -70,41 +70,38 @@ client.on("messageCreate", async (message) => {
   // =========================
   if (command === "ai") {
 
-    const question = args.join(" ");
+  const question = args.join(" ");
+  if (!question) return message.reply("Tulis pertanyaan dulu.");
 
-    if (!question) {
-      return message.reply("Tulis pertanyaan setelah command.");
+  message.reply("🔎 Mencari jawaban...");
+
+  try {
+
+    const results = await googleIt({ query: question, limit: 5 });
+
+    if (!results.length) {
+      return message.reply("Tidak menemukan informasi.");
     }
 
-    message.reply("🔎 Sedang mencari jawaban...");
+    let answer = `📚 Jawaban untuk: **${question}**\n\n`;
 
-    try {
+    results.slice(0,3).forEach((r,i)=>{
+      answer += `${i+1}. ${r.title}\n`;
+      answer += `${r.snippet || "Tidak ada deskripsi"}\n`;
+      answer += `${r.link}\n\n`;
+    });
 
-      const results = await googleIt({
-        query: question,
-        limit: 3
-      });
+    message.reply(answer);
 
-      if (!results.length) {
-        return message.reply("Tidak menemukan informasi.");
-      }
+  } catch (err) {
 
-      let reply = `📚 Hasil pencarian untuk: **${question}**\n\n`;
+    console.log(err);
+    message.reply("AI tidak bisa mengambil data dari web.");
 
-      results.forEach((r, i) => {
-        reply += `${i + 1}. **${r.title}**\n${r.link}\n\n`;
-      });
-
-      message.reply(reply);
-
-    } catch (err) {
-
-      console.log(err);
-      message.reply("AI Error saat mencari jawaban.");
-
-    }
   }
 
+}
+  
 });
 
 client.login(process.env.TOKEN);
