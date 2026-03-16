@@ -2,14 +2,18 @@
   "name": "voice-ai-bot",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": { "start": "node index.js" },
-  "engines": { "node": ">=16.9.0" },
+  "engines": {
+    "node": ">=16.9.0"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
     "discord.js": "^14.25.1",
     "@discordjs/voice": "^0.19.1",
-    "node-fetch": "^2.6.7",
-    "google-tts-api": "^2.0.1",
     "dotenv": "^16.3.1",
-    "openai": "3.3.0"
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0-rc.12",
+    "google-it": "^1.6.0"
   }
 }
