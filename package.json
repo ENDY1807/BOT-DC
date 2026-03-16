@@ -6,13 +6,14 @@
   "scripts": {
     "start": "node index.js"
   },
+  "engines": {
+    "node": ">=16.9.0"
+  },
   "dependencies": {
     "discord.js": "^14.25.1",
     "@discordjs/voice": "^0.19.1",
     "node-fetch": "^2.6.7",
-    "gtts": "^2.0.0"
-  },
-  "engines": {
-    "node": ">=16.9.0"
+    "openai": "^4.33.0",
+    "google-tts-api": "^2.0.1"
   }
 }
