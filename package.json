@@ -1,7 +1,6 @@
 {
   "name": "voice-ai-bot",
   "version": "1.0.0",
-  "description": "Discord bot AI voice",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
