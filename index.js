@@ -1,16 +1,14 @@
-require('web-streams-polyfill/ponyfill'); // polyfill ReadableStream untuk Node 16
-
-const { Client, GatewayIntentBits } = require("discord.js");
+const { Client, Intents } = require("discord.js");
 const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, StreamType } = require("@discordjs/voice");
 const fetch = require("node-fetch");
 const gtts = require("google-tts-api");
 
 const client = new Client({
   intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildVoiceStates
+    Intents.FLAGS.GUILDS,
+    Intents.FLAGS.GUILD_MESSAGES,
+    Intents.FLAGS.GUILD_VOICE_STATES,
+    Intents.FLAGS.MESSAGE_CONTENT
   ]
 });
 
@@ -71,6 +69,7 @@ client.on("messageCreate", async (message) => {
     if (!question) return message.reply("Masukkan pertanyaan.");
 
     try {
+      // Chat AI
       const res = await fetch("https://api.affiliateplus.xyz/api/chatbot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -88,15 +87,13 @@ client.on("messageCreate", async (message) => {
       const replyText = data.message.slice(0, 2000);
       message.reply(replyText);
 
-      // ====================
-      // TEXT-TO-SPEECH
-      // ====================
+      // Text-to-Speech
       const connection = getVoiceConnection(message.guild.id);
       if (connection) {
         const url = gtts.getAudioUrl(replyText, {
-          lang: 'id',
+          lang: "id",
           slow: false,
-          host: 'https://translate.google.com'
+          host: "https://translate.google.com"
         });
 
         const player = createAudioPlayer();
