@@ -64,7 +64,7 @@ client.on("messageCreate", async (message) => {
   // ====================
   // AI COMMAND
   // ====================
-  const fetch = require("node-fetch");
+const fetch = require("node-fetch");
 
 if (command === "ai") {
 
@@ -76,26 +76,26 @@ if (command === "ai") {
 
   try {
 
-    const response = await fetch(
-      "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          inputs: question
-        })
-      }
-    );
+    const res = await fetch("https://api.affiliateplus.xyz/api/chatbot", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: question,
+        botname: "VoiceAI",
+        ownername: "Endy",
+        user: message.author.id
+      })
+    });
 
-    const data = await response.json();
+    const data = await res.json();
 
-    if (!data.generated_text) {
-      return message.reply("AI tidak bisa menjawab.");
+    if (!data.message) {
+      return message.reply("AI tidak bisa menjawab sekarang.");
     }
 
-    return message.reply(data.generated_text.slice(0,1900));
+    return message.reply(data.message.slice(0,1900));
 
   } catch (err) {
 
