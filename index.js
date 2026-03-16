@@ -68,7 +68,9 @@ client.on("messageCreate", async (message) => {
   // =========================
   // AI SEARCH
   // =========================
-  if (command === "ai") {
+const axios = require("axios");
+
+if (command === "ai") {
 
   const question = args.join(" ");
   if (!question) return message.reply("Tulis pertanyaan dulu.");
@@ -77,26 +79,22 @@ client.on("messageCreate", async (message) => {
 
   try {
 
-    const results = await googleIt({ query: question, limit: 5 });
+    const url = `https://id.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(question)}`;
 
-    if (!results.length) {
-      return message.reply("Tidak menemukan informasi.");
+    const res = await axios.get(url);
+
+    if (!res.data.extract) {
+      return message.reply("Informasi tidak ditemukan.");
     }
 
-    let answer = `📚 Jawaban untuk: **${question}**\n\n`;
-
-    results.slice(0,3).forEach((r,i)=>{
-      answer += `${i+1}. ${r.title}\n`;
-      answer += `${r.snippet || "Tidak ada deskripsi"}\n`;
-      answer += `${r.link}\n\n`;
-    });
+    let answer = `📚 **${res.data.title}**\n\n${res.data.extract}`;
 
     message.reply(answer);
 
   } catch (err) {
 
     console.log(err);
-    message.reply("AI tidak bisa mengambil data dari web.");
+    message.reply("Informasi tidak ditemukan atau topik terlalu spesifik.");
 
   }
 
