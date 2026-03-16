@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const { Client, GatewayIntentBits } = require("discord.js");
 const { joinVoiceChannel, getVoiceConnection } = require("@discordjs/voice");
-const googleIt = require("google-it");
+const axios = require("axios");
 
 const client = new Client({
   intents: [
@@ -24,18 +24,18 @@ client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(PREFIX)) return;
 
-  const args = message.content.slice(PREFIX.length).trim().split(" ");
+  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
   // =========================
-  // VOICE JOIN
+  // JOIN VOICE
   // =========================
   if (command === "voice") {
 
     const vc = message.member.voice.channel;
 
     if (!vc) {
-      return message.reply("Masuk voice channel dulu bro.");
+      return message.reply("Masuk voice channel dulu.");
     }
 
     joinVoiceChannel({
@@ -46,7 +46,7 @@ client.on("messageCreate", async (message) => {
       selfDeaf: false
     });
 
-    message.reply(`Bot masuk ke voice **${vc.name}** (AFK mode)`);
+    message.reply(`Bot masuk ke voice: ${vc.name}`);
   }
 
   // =========================
@@ -61,45 +61,47 @@ client.on("messageCreate", async (message) => {
     }
 
     connection.destroy();
-
     message.reply("Bot keluar dari voice.");
   }
 
   // =========================
-  // AI SEARCH
+  // AI COMMAND
   // =========================
-const axios = require("axios");
+  if (command === "ai") {
 
-if (command === "ai") {
+    const question = args.join(" ");
 
-  const question = args.join(" ");
-  if (!question) return message.reply("Tulis pertanyaan dulu.");
-
-  message.reply("🔎 Mencari jawaban...");
-
-  try {
-
-    const url = `https://id.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(question)}`;
-
-    const res = await axios.get(url);
-
-    if (!res.data.extract) {
-      return message.reply("Informasi tidak ditemukan.");
+    if (!question) {
+      return message.reply("Tulis pertanyaan setelah ,ai");
     }
 
-    let answer = `📚 **${res.data.title}**\n\n${res.data.extract}`;
+    message.reply("🔎 Mencari jawaban...");
 
-    message.reply(answer);
+    try {
 
-  } catch (err) {
+      const url = `https://id.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(question)}`;
 
-    console.log(err);
-    message.reply("Informasi tidak ditemukan atau topik terlalu spesifik.");
+      const res = await axios.get(url);
 
+      if (!res.data.extract) {
+        return message.reply("Informasi tidak ditemukan.");
+      }
+
+      const answer =
+`📚 **${res.data.title}**
+
+${res.data.extract}`;
+
+      message.reply(answer);
+
+    } catch (err) {
+
+      console.log(err);
+      message.reply("Informasi tidak ditemukan.");
+
+    }
   }
 
-}
-  
 });
 
-client.login(process.env.TOKEN);
+client.login(process.env.DISCORD_TOKEN);
