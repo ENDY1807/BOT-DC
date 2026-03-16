@@ -3,6 +3,8 @@ require("dotenv").config();
 const { Client, GatewayIntentBits } = require("discord.js");
 const { joinVoiceChannel, getVoiceConnection } = require("@discordjs/voice");
 const axios = require("axios");
+const cheerio = require("cheerio");
+const googleIt = require("google-it");
 
 const client = new Client({
   intents: [
@@ -15,10 +17,12 @@ const client = new Client({
 
 const PREFIX = ",";
 
+// ================= BOT READY =================
 client.once("ready", () => {
   console.log(`Bot aktif sebagai ${client.user.tag}`);
 });
 
+// ================= MESSAGE =================
 client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
@@ -27,29 +31,32 @@ client.on("messageCreate", async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // ================= VOICE JOIN =================
+  // ================= VOICE =================
+
   if (command === "voice") {
 
     const vc = message.member.voice.channel;
-    if (!vc) return message.reply("Masuk voice channel dulu.");
+
+    if (!vc) {
+      return message.reply("Masuk voice channel dulu.");
+    }
 
     joinVoiceChannel({
       channelId: vc.id,
       guildId: vc.guild.id,
-      adapterCreator: vc.guild.voiceAdapterCreator,
-      selfMute: true,
-      selfDeaf: false
+      adapterCreator: vc.guild.voiceAdapterCreator
     });
 
-    return message.reply("Bot masuk voice.");
+    return message.reply("🎧 Bot masuk voice.");
   }
 
-  // ================= VOICE LEAVE =================
   if (command === "leave") {
 
     const connection = getVoiceConnection(message.guild.id);
 
-    if (!connection) return message.reply("Bot tidak di voice.");
+    if (!connection) {
+      return message.reply("Bot tidak sedang di voice.");
+    }
 
     connection.destroy();
 
@@ -57,41 +64,66 @@ client.on("messageCreate", async (message) => {
   }
 
   // ================= AI =================
+
   if (command === "ai") {
 
     const question = args.join(" ");
 
-    if (!question) return message.reply("Tulis pertanyaan setelah ,ai");
+    if (!question) {
+      return message.reply("Tulis pertanyaan setelah ,ai");
+    }
 
-    message.reply("🔎 AI mencari informasi...");
+    message.reply("🔎 AI sedang mencari jawaban di internet...");
 
     try {
 
-      // cari topik di wikipedia
-      const search = await axios.get(
-        `https://id.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(question)}&format=json`
-      );
+      const searchResults = await googleIt({ query: question });
 
-      if (!search.data.query.search.length) {
-        return message.reply("AI tidak menemukan informasi.");
+      if (!searchResults.length) {
+        return message.reply("Informasi tidak ditemukan.");
       }
 
-      const title = search.data.query.search[0].title;
+      let collectedText = "";
 
-      // ambil ringkasan
-      const summary = await axios.get(
-        `https://id.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`
-      );
+      for (let i = 0; i < Math.min(3, searchResults.length); i++) {
 
-      const text = summary.data.extract;
+        try {
 
-      return message.reply(`📚 **${title}**\n\n${text}`);
+          const url = searchResults[i].link;
+
+          const res = await axios.get(url, {
+            timeout: 8000,
+            headers: {
+              "User-Agent": "Mozilla/5.0"
+            }
+          });
+
+          const $ = cheerio.load(res.data);
+
+          const paragraphs = $("p")
+            .map((i, el) => $(el).text())
+            .get()
+            .join(" ");
+
+          collectedText += paragraphs.substring(0, 700) + "\n\n";
+
+        } catch {}
+
+      }
+
+      if (!collectedText) {
+        return message.reply("AI tidak bisa membaca website.");
+      }
+
+      const answer = collectedText.substring(0, 1200);
+
+      message.reply(`📚 **Jawaban dari internet:**\n\n${answer}...`);
 
     } catch (err) {
 
       console.log(err);
 
-      return message.reply("AI gagal mengambil informasi.");
+      message.reply("AI mengalami error saat browsing.");
 
     }
 
@@ -99,4 +131,4 @@ client.on("messageCreate", async (message) => {
 
 });
 
-client.login(process.env.TOKEN);
+client.login(process.env.DISCORD_TOKEN);
