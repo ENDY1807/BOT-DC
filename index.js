@@ -1,6 +1,4 @@
-const TOKEN = process.env.TOKEN;
-const OPENAI_KEY = process.env.OPENAI_KEY;
-
+require("dotenv").config();
 const { Client, GatewayIntentBits } = require("discord.js");
 const {
   joinVoiceChannel,
@@ -22,6 +20,7 @@ const client = new Client({
 });
 
 const prefix = ",";
+const OPENAI_KEY = process.env.OPENAI_KEY;
 
 client.once("ready", () => {
   console.log(`Bot online sebagai ${client.user.tag}`);
@@ -60,7 +59,7 @@ client.on("messageCreate", async (message) => {
     if (!question) return message.reply("Masukkan pertanyaan.");
 
     try {
-      // Request ke OpenAI via fetch
+      // Request ke ChatGPT
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -70,7 +69,7 @@ client.on("messageCreate", async (message) => {
         body: JSON.stringify({
           model: "gpt-3.5-turbo",
           messages: [
-            { role: "system", content: "Kamu adalah asisten yang ramah dan membalas dengan bahasa Indonesia." },
+            { role: "system", content: "Kamu adalah asisten ramah yang membalas dengan bahasa Indonesia." },
             { role: "user", content: question }
           ]
         })
@@ -115,4 +114,4 @@ COMMAND BOT
   }
 });
 
-client.login(TOKEN);
+client.login(process.env.TOKEN);
