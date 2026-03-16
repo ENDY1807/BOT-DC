@@ -2,18 +2,18 @@
   "name": "voice-ai-bot",
   "version": "1.0.0",
   "main": "index.js",
-  "engines": {
-    "node": ">=16.9.0"
-  },
   "scripts": {
     "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "discord.js": "^14.25.1",
     "@discordjs/voice": "^0.19.1",
-    "dotenv": "^16.3.1",
     "axios": "^1.6.0",
-    "cheerio": "^1.0.0-rc.12",
-    "google-it": "^1.6.0"
+    "cheerio": "^1.0.0",
+    "google-it": "^1.6.0",
+    "dotenv": "^16.3.1"
   }
 }
