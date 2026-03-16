@@ -1,10 +1,25 @@
-require("dotenv").config(); // pastikan ada file .env dengan OPENAI_KEY
+// Ambil env dari hosting
+const TOKEN = process.env.TOKEN;
+const OPENAI_KEY = process.env.OPENAI_KEY;
+
 const { Client, GatewayIntentBits } = require("discord.js");
-const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, StreamType } = require("@discordjs/voice");
-const gtts = require("google-tts-api");
-const fs = require("fs");
+const {
+  joinVoiceChannel,
+  getVoiceConnection,
+  createAudioPlayer,
+  createAudioResource,
+  StreamType
+} = require("@discordjs/voice");
 const fetch = require("node-fetch");
+const gtts = require("google-tts-api"); // versi stabil, tanpa gtts asli
+
 const { Configuration, OpenAIApi } = require("openai");
+
+// Setup OpenAI
+const configuration = new Configuration({
+  apiKey: OPENAI_KEY
+});
+const openai = new OpenAIApi(configuration);
 
 const client = new Client({
   intents: [
@@ -16,12 +31,6 @@ const client = new Client({
 });
 
 const prefix = ",";
-
-// Setup OpenAI
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_KEY
-});
-const openai = new OpenAIApi(configuration);
 
 client.once("ready", () => {
   console.log(`Bot online sebagai ${client.user.tag}`);
@@ -81,35 +90,43 @@ client.on("messageCreate", async (message) => {
     if (!question) return message.reply("Masukkan pertanyaan.");
 
     try {
-      // Panggil OpenAI Chat API
-      const completion = await openai.chat.completions.create({
+      // ====================
+      // CHAT AI OPENAI
+      // ====================
+      const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: question }]
+        messages: [
+          { role: "system", content: "Kamu adalah asisten yang ramah dan membalas dengan bahasa Indonesia." },
+          { role: "user", content: question }
+        ]
       });
 
-      const replyText = completion.choices[0].message.content.slice(0, 2000);
-      message.reply(replyText);
+      const replyText = response.choices[0].message.content;
+      await message.reply(replyText);
 
       // ====================
       // TEXT-TO-SPEECH
       // ====================
       const connection = getVoiceConnection(message.guild.id);
       if (connection) {
+        // Buat URL TTS dari google-tts-api
         const url = gtts.getAudioUrl(replyText, {
-          lang: 'id',
+          lang: "id",
           slow: false,
-          host: 'https://translate.google.com',
+          host: "https://translate.google.com"
         });
 
-        const resource = createAudioResource(url, { inputType: StreamType.Arbitrary });
         const player = createAudioPlayer();
+        const resource = createAudioResource(url, {
+          inputType: StreamType.Arbitrary
+        });
+
         player.play(resource);
         connection.subscribe(player);
       }
-
     } catch (err) {
       console.log(err);
-      message.reply("AI error.");
+      message.reply("AI error atau voice gagal diputar.");
     }
   }
 
@@ -128,7 +145,4 @@ COMMAND BOT
   }
 });
 
-// ====================
-// LOGIN BOT
-// ====================
-client.login(process.env.TOKEN);
+client.login(TOKEN);
