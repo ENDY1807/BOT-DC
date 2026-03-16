@@ -1,10 +1,6 @@
 const { Client, GatewayIntentBits } = require("discord.js");
 const { joinVoiceChannel, getVoiceConnection } = require("@discordjs/voice");
-const OpenAI = require("openai");
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const { search } = require("duck-duck-scrape");
 
 const client = new Client({
   intents: [
@@ -66,7 +62,7 @@ client.on("messageCreate", async (message) => {
   }
 
   // ====================
-  // AI COMMAND
+  // AI SEARCH COMMAND
   // ====================
   if (command === "ai") {
 
@@ -78,21 +74,26 @@ client.on("messageCreate", async (message) => {
 
     try {
 
-      const response = await openai.responses.create({
-        model: "gpt-4.1-mini",
-        input: question
+      const results = await search(question);
+
+      if (!results.results.length) {
+        return message.reply("Tidak menemukan jawaban di internet.");
+      }
+
+      const top = results.results.slice(0, 3);
+
+      let text = `Hasil pencarian untuk **${question}**:\n\n`;
+
+      top.forEach((r, i) => {
+        text += `${i+1}. **${r.title}**\n${r.description}\n${r.url}\n\n`;
       });
 
-      const answer = response.output_text;
-
-      return message.reply(answer.slice(0, 1900));
+      return message.reply(text.slice(0,1900));
 
     } catch (err) {
 
-      console.log("AI ERROR:");
       console.log(err);
-
-      return message.reply("AI error, cek console server.");
+      return message.reply("AI search error.");
 
     }
 
@@ -108,7 +109,7 @@ COMMAND BOT
 
 ,voice → bot masuk voice
 ,leave → bot keluar voice
-,ai <pertanyaan> → tanya AI
+,ai <pertanyaan> → cari jawaban di internet
 ,help → lihat command
 `);
 
