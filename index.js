@@ -59,7 +59,6 @@ client.on("messageCreate", async (message) => {
     if (!question) return message.reply("Masukkan pertanyaan.");
 
     try {
-      // Request ke ChatGPT
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -69,7 +68,7 @@ client.on("messageCreate", async (message) => {
         body: JSON.stringify({
           model: "gpt-3.5-turbo",
           messages: [
-            { role: "system", content: "Kamu adalah asisten ramah yang membalas dengan bahasa Indonesia." },
+            { role: "system", content: "Kamu asisten ramah, jawab pakai bahasa Indonesia." },
             { role: "user", content: question }
           ]
         })
@@ -79,7 +78,6 @@ client.on("messageCreate", async (message) => {
       const replyText = data.choices[0].message.content;
       await message.reply(replyText);
 
-      // Play voice
       const connection = getVoiceConnection(message.guild.id);
       if (connection) {
         const url = gtts.getAudioUrl(replyText, {
@@ -96,9 +94,8 @@ client.on("messageCreate", async (message) => {
         player.play(resource);
         connection.subscribe(player);
       }
-
     } catch (err) {
-      console.log(err);
+      console.error(err);
       message.reply("AI error atau voice gagal diputar.");
     }
   }
