@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits } = require("discord.js");
-const { joinVoiceChannel, getVoiceConnection } = require("@discordjs/voice");
+const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType } = require("@discordjs/voice");
 const fetch = require("node-fetch");
+const gTTS = require("gtts"); // npm install gtts
 
 const client = new Client({
   intents: [
@@ -13,10 +14,13 @@ const client = new Client({
 
 const prefix = ",";
 
-client.once("clientReady", () => {
+client.once("ready", () => {
   console.log(`Bot online sebagai ${client.user.tag}`);
 });
 
+// ====================
+// MESSAGE HANDLER
+// ====================
 client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
@@ -29,97 +33,96 @@ client.on("messageCreate", async (message) => {
   // JOIN VOICE
   // ====================
   if (command === "voice") {
-
-    if (!message.member.voice.channel) {
-      return message.reply("Masuk voice dulu.");
-    }
-
+    if (!message.member.voice.channel) return message.reply("Masuk voice dulu.");
     const channel = message.member.voice.channel;
 
-    joinVoiceChannel({
-      channelId: channel.id,
-      guildId: channel.guild.id,
-      adapterCreator: channel.guild.voiceAdapterCreator
-    });
-
-    return message.reply("Bot masuk ke voice.");
+    try {
+      joinVoiceChannel({
+        channelId: channel.id,
+        guildId: channel.guild.id,
+        adapterCreator: channel.guild.voiceAdapterCreator,
+        selfDeaf: false
+      });
+      return message.reply("Bot masuk ke voice dan stay di channel!");
+    } catch (err) {
+      console.log(err);
+      return message.reply("Gagal join voice.");
+    }
   }
 
   // ====================
   // LEAVE VOICE
   // ====================
   if (command === "leave") {
-
     const connection = getVoiceConnection(message.guild.id);
-
-    if (!connection) {
-      return message.reply("Bot tidak ada di voice.");
+    if (!connection) return message.reply("Bot tidak ada di voice.");
+    try {
+      connection.destroy();
+      return message.reply("Bot keluar dari voice.");
+    } catch (err) {
+      console.log(err);
+      return message.reply("Gagal keluar voice.");
     }
-
-    connection.destroy();
-
-    return message.reply("Bot keluar dari voice.");
   }
 
   // ====================
-  // AI COMMAND
+  // AI CHAT
   // ====================
-const fetch = require("node-fetch");
+  if (command === "ai") {
+    const question = args.join(" ");
+    if (!question) return message.reply("Masukkan pertanyaan.");
 
-if (command === "ai") {
+    try {
+      const res = await fetch("https://api.affiliateplus.xyz/api/chatbot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: question,
+          botname: "VoiceAI",
+          ownername: "Endy",
+          user: message.author.id
+        })
+      });
 
-  const question = args.join(" ");
+      const data = await res.json();
+      if (!data.message) return message.reply("AI tidak bisa menjawab sekarang.");
 
-  if (!question) {
-    return message.reply("Masukkan pertanyaan.");
-  }
+      const replyText = data.message.slice(0, 2000);
+      message.reply(replyText);
 
-  try {
+      // ====================
+      // TEXT-TO-SPEECH
+      // ====================
+      const connection = getVoiceConnection(message.guild.id);
+      if (connection) {
+        const tts = new gTTS(replyText, "id");
+        const path = `./tts-${Date.now()}.mp3`;
+        tts.save(path, () => {
+          const player = createAudioPlayer();
+          const resource = createAudioResource(path, { inputType: StreamType.Arbitrary });
+          player.play(resource);
+          connection.subscribe(player);
+        });
+      }
 
-    const res = await fetch("https://api.affiliateplus.xyz/api/chatbot", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: question,
-        botname: "VoiceAI",
-        ownername: "Endy",
-        user: message.author.id
-      })
-    });
-
-    const data = await res.json();
-
-    if (!data.message) {
-      return message.reply("AI tidak bisa menjawab sekarang.");
+    } catch (err) {
+      console.log(err);
+      message.reply("AI error.");
     }
-
-    return message.reply(data.message.slice(0,1900));
-
-  } catch (err) {
-
-    console.log(err);
-    return message.reply("AI error.");
-
   }
-
-}
 
   // ====================
   // HELP
   // ====================
   if (command === "help") {
-
     return message.reply(`
 COMMAND BOT
 
-,voice → bot masuk voice
+,voice → bot join voice dan stay
 ,leave → bot keluar voice
-,ai <pertanyaan> → cari info dari Wikipedia
+,ai <pertanyaan> → chat AI & bot bacain di voice
 ,help → lihat command
 `);
-
   }
 
 });
