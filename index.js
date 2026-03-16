@@ -46,7 +46,7 @@ client.on("messageCreate", async (message) => {
       adapterCreator: channel.guild.voiceAdapterCreator
     });
 
-    message.reply("Bot masuk ke voice.");
+    return message.reply("Bot masuk ke voice.");
   }
 
   // ====================
@@ -62,7 +62,7 @@ client.on("messageCreate", async (message) => {
 
     connection.destroy();
 
-    message.reply("Bot keluar dari voice.");
+    return message.reply("Bot keluar dari voice.");
   }
 
   // ====================
@@ -78,27 +78,22 @@ client.on("messageCreate", async (message) => {
 
     try {
 
-      const completion = await openai.chat.completions.create({
+      const response = await openai.responses.create({
         model: "gpt-4.1-mini",
-        messages: [
-          {
-            role: "system",
-            content: "Kamu adalah AI Discord yang membantu user dengan jawaban yang jelas."
-          },
-          {
-            role: "user",
-            content: question
-          }
-        ]
+        input: question
       });
 
-      const answer = completion.choices[0].message.content;
+      const answer = response.output_text;
 
-      message.reply(answer.slice(0, 1900));
+      return message.reply(answer.slice(0, 1900));
 
     } catch (err) {
-      console.error(err);
-      message.reply("AI error.");
+
+      console.log("AI ERROR:");
+      console.log(err);
+
+      return message.reply("AI error, cek console server.");
+
     }
 
   }
@@ -108,8 +103,8 @@ client.on("messageCreate", async (message) => {
   // ====================
   if (command === "help") {
 
-    message.reply(`
-COMMAND BOT:
+    return message.reply(`
+COMMAND BOT
 
 ,voice → bot masuk voice
 ,leave → bot keluar voice
