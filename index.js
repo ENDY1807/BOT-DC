@@ -1,9 +1,8 @@
-require('dotenv').config();
-const { Client, GatewayIntentBits } = require('discord.js');
-const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
-const googleIt = require('google-it');
-const axios = require('axios');
-const cheerio = require('cheerio');
+require("dotenv").config();
+
+const { Client, GatewayIntentBits } = require("discord.js");
+const { joinVoiceChannel, getVoiceConnection } = require("@discordjs/voice");
+const googleIt = require("google-it");
 
 const client = new Client({
   intents: [
@@ -14,77 +13,98 @@ const client = new Client({
   ]
 });
 
-const PREFIX = process.env.PREFIX || "!";
+const PREFIX = ",";
 
-client.on('ready', () => {
+client.once("ready", () => {
   console.log(`Bot aktif sebagai ${client.user.tag}`);
 });
 
-// Command handler
-client.on('messageCreate', async (message) => {
+client.on("messageCreate", async (message) => {
+
   if (message.author.bot) return;
   if (!message.content.startsWith(PREFIX)) return;
 
-  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+  const args = message.content.slice(PREFIX.length).trim().split(" ");
   const command = args.shift().toLowerCase();
 
-  // ===== Voice join/afk =====
+  // =========================
+  // VOICE JOIN
+  // =========================
   if (command === "voice") {
+
     const vc = message.member.voice.channel;
-    if (!vc) return message.reply("Kamu harus berada di voice channel dulu!");
+
+    if (!vc) {
+      return message.reply("Masuk voice channel dulu bro.");
+    }
+
     joinVoiceChannel({
       channelId: vc.id,
       guildId: vc.guild.id,
       adapterCreator: vc.guild.voiceAdapterCreator,
-      selfDeaf: false,
-      selfMute: true // AFK mode
+      selfMute: true,
+      selfDeaf: false
     });
-    message.reply(`Berhasil join voice channel: **${vc.name}** (AFK mode)`);
+
+    message.reply(`Bot masuk ke voice **${vc.name}** (AFK mode)`);
   }
 
-  // ===== Leave voice =====
+  // =========================
+  // LEAVE VOICE
+  // =========================
   if (command === "leave") {
+
     const connection = getVoiceConnection(message.guild.id);
-    if (!connection) return message.reply("Bot tidak sedang berada di voice channel!");
+
+    if (!connection) {
+      return message.reply("Bot tidak sedang di voice.");
+    }
+
     connection.destroy();
-    message.reply("Bot telah keluar dari voice channel.");
+
+    message.reply("Bot keluar dari voice.");
   }
 
-  // ===== AI chat =====
+  // =========================
+  // AI SEARCH
+  // =========================
   if (command === "ai") {
-    const query = args.join(" ");
-    if (!query) return message.reply("Tolong tulis pertanyaanmu!");
 
-    message.channel.send(`Mencari jawaban untuk: **${query}** ...`);
+    const question = args.join(" ");
+
+    if (!question) {
+      return message.reply("Tulis pertanyaan setelah command.");
+    }
+
+    message.reply("🔎 Sedang mencari jawaban...");
 
     try {
-      // Cari hasil dari Google
-      const results = await googleIt({ query, limit: 3 });
 
-      let replyText = "";
-      for (let i = 0; i < results.length; i++) {
-        const link = results[i].link;
+      const results = await googleIt({
+        query: question,
+        limit: 3
+      });
 
-        try {
-          const { data } = await axios.get(link);
-          const $ = cheerio.load(data);
-          const text = $("p").first().text();
-          if (text) {
-            replyText += `**Sumber:** ${link}\n**Info:** ${text}\n\n`;
-          }
-        } catch (err) {
-          replyText += `**Sumber:** ${link}\n**Info:** Tidak bisa diambil.\n\n`;
-        }
+      if (!results.length) {
+        return message.reply("Tidak menemukan informasi.");
       }
 
-      if (!replyText) replyText = "Maaf, tidak menemukan jawaban yang jelas.";
-      message.reply(replyText);
+      let reply = `📚 Hasil pencarian untuk: **${question}**\n\n`;
+
+      results.forEach((r, i) => {
+        reply += `${i + 1}. **${r.title}**\n${r.link}\n\n`;
+      });
+
+      message.reply(reply);
 
     } catch (err) {
-      console.error(err);
-      message.reply("Ada error saat mencari jawaban.");
+
+      console.log(err);
+      message.reply("AI Error saat mencari jawaban.");
+
     }
   }
+
 });
 
-client.login(process.env.TOKEN);
+client.login(process.env.DISCORD_TOKEN);
