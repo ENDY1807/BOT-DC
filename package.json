@@ -9,8 +9,9 @@
   "dependencies": {
     "discord.js": "^13.14.0",
     "@discordjs/voice": "^0.11.0",
-    "node-fetch": "^2.6.7",
-    "google-tts-api": "^2.0.1"
+    "google-tts-api": "^2.0.1",
+    "openai": "^4.33.0",
+    "node-fetch": "^2.6.7"
   },
   "engines": {
     "node": ">=16.9.0"
