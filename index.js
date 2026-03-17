@@ -8,7 +8,6 @@ const {
 } = require("@discordjs/voice");
 
 const play = require("play-dl");
-const googleIt = require("google-it");
 const axios = require("axios");
 
 const client = new Client({
@@ -24,7 +23,7 @@ let connection;
 let player = createAudioPlayer();
 
 client.once("ready", () => {
-  console.log(`✅ Bot nyala: ${client.user.tag}`);
+  console.log(`✅ Bot aktif: ${client.user.tag}`);
 });
 
 client.on("messageCreate", async (message) => {
@@ -35,9 +34,8 @@ client.on("messageCreate", async (message) => {
 
   // ================= VOICE =================
   if (cmd === ",voice") {
-    if (!message.member.voice.channel) {
-      return message.reply("❌ Masuk VC dulu bro");
-    }
+    if (!message.member.voice.channel)
+      return message.reply("❌ Masuk VC dulu");
 
     connection = joinVoiceChannel({
       channelId: message.member.voice.channel.id,
@@ -46,8 +44,7 @@ client.on("messageCreate", async (message) => {
     });
 
     connection.subscribe(player);
-
-    message.reply("✅ Bot masuk voice (AFK)");
+    message.reply("✅ Masuk VC");
   }
 
   // ================= LEAVE =================
@@ -55,29 +52,26 @@ client.on("messageCreate", async (message) => {
     if (connection) {
       connection.destroy();
       connection = null;
-      message.reply("👋 Keluar dari voice");
-    } else {
-      message.reply("❌ Bot ga di VC");
+      message.reply("👋 Keluar VC");
     }
   }
 
   // ================= PLAY =================
   if (cmd === ",play") {
     const query = args.slice(1).join(" ");
-    if (!query) return message.reply("❌ Masukin judul / link");
+    if (!query) return message.reply("❌ Masukin lagu");
 
-    if (!connection) {
+    if (!connection)
       return message.reply("❌ Pake ,voice dulu");
-    }
 
     try {
       let url = query;
 
       if (!query.includes("youtube.com")) {
         const search = await play.search(query, { limit: 1 });
-        if (!search.length) {
-          return message.reply("❌ Lagu ga ketemu");
-        }
+        if (!search.length)
+          return message.reply("❌ Ga ketemu");
+
         url = search[0].url;
       }
 
@@ -88,7 +82,7 @@ client.on("messageCreate", async (message) => {
 
       player.play(resource);
 
-      message.reply(`▶️ Play: ${url}`);
+      message.reply(`▶️ ${url}`);
     } catch (err) {
       console.log(err);
       message.reply("❌ Error play");
@@ -97,40 +91,25 @@ client.on("messageCreate", async (message) => {
 
   // ================= AI =================
   if (cmd === ",ai") {
-    const question = args.slice(1).join(" ");
-    if (!question) return message.reply("❌ Tulis pertanyaan");
+    const q = args.slice(1).join(" ");
+    if (!q) return message.reply("❌ Tanya apa?");
 
     try {
-      message.reply("🔍 Nyari jawaban...");
+      message.reply("🔍 Nyari...");
 
-      // GOOGLE SEARCH
-      const results = await googleIt({ query: question });
-
-      if (results.length > 0) {
-        const top = results[0];
-
-        return message.reply(`
-🧠 **Jawaban:**
-${top.snippet || "Tidak ada deskripsi"}
-
-🔗 ${top.link}
-        `);
-      }
-
-      // FALLBACK API
       const res = await axios.get(
-        `https://api.duckduckgo.com/?q=${encodeURIComponent(question)}&format=json`
+        `https://api.duckduckgo.com/?q=${encodeURIComponent(q)}&format=json`
       );
 
       if (res.data.Abstract) {
-        return message.reply(`
-🧠 **Jawaban:**
-${res.data.Abstract}
-        `);
+        return message.reply(`🧠 ${res.data.Abstract}`);
       }
 
-      message.reply("❌ AI Tidak menemukan jawaban");
+      if (res.data.RelatedTopics.length > 0) {
+        return message.reply(`🧠 ${res.data.RelatedTopics[0].Text}`);
+      }
 
+      message.reply("❌ Ai Tidak Menemukan jawaban");
     } catch (err) {
       console.log(err);
       message.reply("❌ AI error");
