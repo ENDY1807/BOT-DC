@@ -1,17 +1,14 @@
 require("dotenv").config();
-
 const { Client, GatewayIntentBits } = require("discord.js");
 const {
   joinVoiceChannel,
-  getVoiceConnection,
   createAudioPlayer,
   createAudioResource,
   AudioPlayerStatus
 } = require("@discordjs/voice");
-
+const play = require("play-dl");
 const googleIt = require("google-it");
 const axios = require("axios");
-const play = require("play-dl");
 
 const client = new Client({
   intents: [
@@ -22,158 +19,123 @@ const client = new Client({
   ]
 });
 
-const PREFIX = ",";
-const players = new Map();
+let connection;
+let player = createAudioPlayer();
 
-// ================= READY =================
 client.once("ready", () => {
-  console.log(`🤖 Bot aktif: ${client.user.tag}`);
+  console.log(`✅ Bot aktif: ${client.user.tag}`);
 });
 
-// ================= MESSAGE =================
 client.on("messageCreate", async (message) => {
-
   if (message.author.bot) return;
-  if (!message.content.startsWith(PREFIX)) return;
 
-  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
+  const args = message.content.split(" ");
+  const cmd = args[0];
 
-  // ================= HELP =================
-  if (command === "help") {
-    return message.reply(`
-🔥 **ALL IN ONE BOT**
+  // ================= VOICE JOIN =================
+  if (cmd === ",voice") {
+    if (!message.member.voice.channel) {
+      return message.reply("❌ Lu harus masuk VC dulu!");
+    }
 
-,ai <pertanyaan>
-,voice
-,leave
-,nobar
-,play <url>
-,stop
-,ping
-`);
-  }
-
-  // ================= PING =================
-  if (command === "ping") {
-    return message.reply(`🏓 ${client.ws.ping}ms`);
-  }
-
-  // ================= VOICE =================
-  if (command === "voice") {
-    const vc = message.member.voice.channel;
-    if (!vc) return message.reply("Masuk voice dulu.");
-
-    joinVoiceChannel({
-      channelId: vc.id,
-      guildId: vc.guild.id,
-      adapterCreator: vc.guild.voiceAdapterCreator
+    connection = joinVoiceChannel({
+      channelId: message.member.voice.channel.id,
+      guildId: message.guild.id,
+      adapterCreator: message.guild.voiceAdapterCreator
     });
 
-    return message.reply("🎧 Bot masuk voice.");
+    connection.subscribe(player);
+    message.reply("✅ Masuk voice & standby");
   }
 
-  if (command === "leave") {
-    const conn = getVoiceConnection(message.guild.id);
-    if (!conn) return message.reply("Bot tidak di voice.");
-
-    conn.destroy();
-    return message.reply("👋 Bot keluar.");
-  }
-
-  // ================= NOBAR =================
-  if (command === "nobar") {
-
-    const vc = message.member.voice.channel;
-    if (!vc) return message.reply("Masuk voice dulu.");
-
-    const invite = await vc.createInvite({
-      targetApplication: "880218394199220334",
-      targetType: 2,
-      maxAge: 86400
-    });
-
-    return message.reply(`🎬 Nobar bareng:\nhttps://discord.gg/${invite.code}`);
-  }
-
-  // ================= AI =================
-  if (command === "ai") {
-
-    const question = args.join(" ");
-    if (!question) return message.reply("Tulis pertanyaan.");
-
-    message.reply("🔎 AI mencari...");
-
-    try {
-      const results = await googleIt({ query: question });
-
-      if (!results.length) {
-        return message.reply("Tidak ditemukan.");
-      }
-
-      let text = "";
-
-      for (let i = 0; i < 3; i++) {
-        try {
-          const res = await axios.get(results[i].link, { timeout: 5000 });
-          const clean = res.data.replace(/<[^>]*>/g, "");
-          text += clean.slice(0, 400);
-        } catch {}
-      }
-
-      return message.reply(`📚 ${text.slice(0, 1000)}...`);
-
-    } catch (err) {
-      console.log(err);
-      return message.reply("AI error.");
+  // ================= LEAVE =================
+  if (cmd === ",leave") {
+    if (connection) {
+      connection.destroy();
+      connection = null;
+      message.reply("👋 Keluar dari voice");
     }
   }
 
-  // ================= PLAY MUSIC =================
-  if (command === "play") {
+  // ================= NOBAR / PLAY =================
+  if (cmd === ",play") {
+    const query = args.slice(1).join(" ");
+    if (!query) return message.reply("❌ Masukin judul / link!");
 
-    const url = args[0];
-    if (!url) return message.reply("Masukkan link YouTube.");
+    try {
+      let url = query;
 
-    const vc = message.member.voice.channel;
-    if (!vc) return message.reply("Masuk voice dulu.");
+      if (!query.includes("youtube.com")) {
+        const search = await play.search(query, { limit: 1 });
+        if (!search.length) return message.reply("❌ Lagu tidak ditemukan");
+        url = search[0].url;
+      }
 
-    const conn = joinVoiceChannel({
-      channelId: vc.id,
-      guildId: vc.guild.id,
-      adapterCreator: vc.guild.voiceAdapterCreator
-    });
+      const stream = await play.stream(url);
+      const resource = createAudioResource(stream.stream, {
+        inputType: stream.type
+      });
 
-    const stream = await play.stream(url);
-    const resource = createAudioResource(stream.stream, {
-      inputType: stream.type
-    });
+      player.play(resource);
 
-    const player = createAudioPlayer();
-
-    player.play(resource);
-    conn.subscribe(player);
-
-    players.set(message.guild.id, player);
-
-    player.on(AudioPlayerStatus.Idle, () => {
-      conn.destroy();
-    });
-
-    return message.reply("🎵 Memutar musik...");
+      message.reply(`▶️ Play: ${url}`);
+    } catch (err) {
+      console.log(err);
+      message.reply("❌ Gagal play");
+    }
   }
 
-  // ================= STOP MUSIC =================
-  if (command === "stop") {
+  // ================= AI =================
+  if (cmd === ",ai") {
+    const question = args.slice(1).join(" ");
+    if (!question) return message.reply("❌ Tulis pertanyaan!");
 
-    const player = players.get(message.guild.id);
-    if (!player) return message.reply("Tidak ada musik.");
+    try {
+      message.reply("🔍 Lagi nyari jawaban...");
 
-    player.stop();
+      // 1. Google Search
+      const results = await googleIt({ query: question });
 
-    return message.reply("⏹ Musik dihentikan.");
+      if (!results.length) {
+        return message.reply("❌ Tidak ditemukan");
+      }
+
+      // 2. Ambil snippet terbaik
+      const top = results[0];
+
+      let answer = `
+🧠 **Jawaban AI:**
+
+${top.snippet || "Tidak ada deskripsi"}
+
+🔗 Sumber: ${top.link}
+`;
+
+      message.reply(answer);
+
+    } catch (err) {
+      console.log(err);
+
+      // fallback kalau google error
+      try {
+        const res = await axios.get(
+          `https://api.duckduckgo.com/?q=${encodeURIComponent(question)}&format=json`
+        );
+
+        if (res.data.Abstract) {
+          return message.reply(`
+🧠 **Jawaban AI:**
+
+${res.data.Abstract}
+          `);
+        }
+
+        message.reply("❌ AI tidak menemukan jawaban");
+      } catch {
+        message.reply("❌ Error parah");
+      }
+    }
   }
-
 });
 
 // ================= LOGIN =================
