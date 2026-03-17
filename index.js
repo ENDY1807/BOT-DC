@@ -177,4 +177,4 @@ client.on("messageCreate", async (message) => {
 });
 
 // ================= LOGIN =================
-client.login(process.env.DISCORD_TOKEN);
+client.login(process.env.TOKEN);
