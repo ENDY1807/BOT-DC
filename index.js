@@ -1,11 +1,12 @@
 require("dotenv").config();
+
 const { Client, GatewayIntentBits } = require("discord.js");
 const {
   joinVoiceChannel,
   createAudioPlayer,
-  createAudioResource,
-  AudioPlayerStatus
+  createAudioResource
 } = require("@discordjs/voice");
+
 const play = require("play-dl");
 const googleIt = require("google-it");
 const axios = require("axios");
@@ -23,7 +24,7 @@ let connection;
 let player = createAudioPlayer();
 
 client.once("ready", () => {
-  console.log(`✅ Bot aktif: ${client.user.tag}`);
+  console.log(`✅ Bot nyala: ${client.user.tag}`);
 });
 
 client.on("messageCreate", async (message) => {
@@ -32,10 +33,10 @@ client.on("messageCreate", async (message) => {
   const args = message.content.split(" ");
   const cmd = args[0];
 
-  // ================= VOICE JOIN =================
+  // ================= VOICE =================
   if (cmd === ",voice") {
     if (!message.member.voice.channel) {
-      return message.reply("❌ Lu harus masuk VC dulu!");
+      return message.reply("❌ Masuk VC dulu bro");
     }
 
     connection = joinVoiceChannel({
@@ -45,7 +46,8 @@ client.on("messageCreate", async (message) => {
     });
 
     connection.subscribe(player);
-    message.reply("✅ Masuk voice & standby");
+
+    message.reply("✅ Bot masuk voice (AFK)");
   }
 
   // ================= LEAVE =================
@@ -54,20 +56,28 @@ client.on("messageCreate", async (message) => {
       connection.destroy();
       connection = null;
       message.reply("👋 Keluar dari voice");
+    } else {
+      message.reply("❌ Bot ga di VC");
     }
   }
 
-  // ================= NOBAR / PLAY =================
+  // ================= PLAY =================
   if (cmd === ",play") {
     const query = args.slice(1).join(" ");
-    if (!query) return message.reply("❌ Masukin judul / link!");
+    if (!query) return message.reply("❌ Masukin judul / link");
+
+    if (!connection) {
+      return message.reply("❌ Pake ,voice dulu");
+    }
 
     try {
       let url = query;
 
       if (!query.includes("youtube.com")) {
         const search = await play.search(query, { limit: 1 });
-        if (!search.length) return message.reply("❌ Lagu tidak ditemukan");
+        if (!search.length) {
+          return message.reply("❌ Lagu ga ketemu");
+        }
         url = search[0].url;
       }
 
@@ -81,62 +91,51 @@ client.on("messageCreate", async (message) => {
       message.reply(`▶️ Play: ${url}`);
     } catch (err) {
       console.log(err);
-      message.reply("❌ Gagal play");
+      message.reply("❌ Error play");
     }
   }
 
   // ================= AI =================
   if (cmd === ",ai") {
     const question = args.slice(1).join(" ");
-    if (!question) return message.reply("❌ Tulis pertanyaan!");
+    if (!question) return message.reply("❌ Tulis pertanyaan");
 
     try {
-      message.reply("🔍 Lagi nyari jawaban...");
+      message.reply("🔍 Nyari jawaban...");
 
-      // 1. Google Search
+      // GOOGLE SEARCH
       const results = await googleIt({ query: question });
 
-      if (!results.length) {
-        return message.reply("❌ Tidak ditemukan");
-      }
+      if (results.length > 0) {
+        const top = results[0];
 
-      // 2. Ambil snippet terbaik
-      const top = results[0];
-
-      let answer = `
-🧠 **Jawaban AI:**
-
+        return message.reply(`
+🧠 **Jawaban:**
 ${top.snippet || "Tidak ada deskripsi"}
 
-🔗 Sumber: ${top.link}
-`;
+🔗 ${top.link}
+        `);
+      }
 
-      message.reply(answer);
+      // FALLBACK API
+      const res = await axios.get(
+        `https://api.duckduckgo.com/?q=${encodeURIComponent(question)}&format=json`
+      );
+
+      if (res.data.Abstract) {
+        return message.reply(`
+🧠 **Jawaban:**
+${res.data.Abstract}
+        `);
+      }
+
+      message.reply("❌ AI Tidak menemukan jawaban");
 
     } catch (err) {
       console.log(err);
-
-      // fallback kalau google error
-      try {
-        const res = await axios.get(
-          `https://api.duckduckgo.com/?q=${encodeURIComponent(question)}&format=json`
-        );
-
-        if (res.data.Abstract) {
-          return message.reply(`
-🧠 **Jawaban AI:**
-
-${res.data.Abstract}
-          `);
-        }
-
-        message.reply("❌ AI tidak menemukan jawaban");
-      } catch {
-        message.reply("❌ Error parah");
-      }
+      message.reply("❌ AI error");
     }
   }
 });
 
-// ================= LOGIN =================
 client.login(process.env.TOKEN);
