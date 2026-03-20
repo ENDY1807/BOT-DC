@@ -4,12 +4,14 @@ const { Client, GatewayIntentBits } = require("discord.js");
 const {
   joinVoiceChannel,
   createAudioPlayer,
-  createAudioResource
+  createAudioResource,
+  AudioPlayerStatus
 } = require("@discordjs/voice");
 
 const play = require("play-dl");
-const axios = require("axios");
+const OpenAI = require("openai");
 
+// ================= SETUP =================
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -19,20 +21,49 @@ const client = new Client({
   ]
 });
 
-let connection;
-let player = createAudioPlayer();
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
+let connection;
+const player = createAudioPlayer();
+
+// ================= READY =================
 client.once("ready", () => {
   console.log(`✅ Bot aktif: ${client.user.tag}`);
 });
 
+// ================= MESSAGE =================
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
   const args = message.content.split(" ");
-  const cmd = args[0];
+  const cmd = args[0].toLowerCase();
 
-  // ================= VOICE =================
+  // ================= HELP =================
+  if (cmd === ",help") {
+    return message.reply(`
+🔥 COMMAND BOT 🔥
+
+🎵 MUSIC
+,voice → join VC
+,leave → keluar VC
+,play <judul/url> → play lagu
+
+🧠 AI
+,ai <pertanyaan> → tanya apa aja
+
+⚡ UTILITY
+,ping → cek bot
+`);
+  }
+
+  // ================= PING =================
+  if (cmd === ",ping") {
+    return message.reply("🏓 Pong!");
+  }
+
+  // ================= JOIN VOICE =================
   if (cmd === ",voice") {
     if (!message.member.voice.channel)
       return message.reply("❌ Masuk VC dulu");
@@ -44,22 +75,25 @@ client.on("messageCreate", async (message) => {
     });
 
     connection.subscribe(player);
-    message.reply("✅ Masuk VC");
+
+    return message.reply("✅ Masuk voice channel");
   }
 
   // ================= LEAVE =================
   if (cmd === ",leave") {
-    if (connection) {
-      connection.destroy();
-      connection = null;
-      message.reply("👋 Keluar VC");
-    }
+    if (!connection)
+      return message.reply("❌ Bot ga di VC");
+
+    connection.destroy();
+    connection = null;
+
+    return message.reply("👋 Keluar VC");
   }
 
-  // ================= PLAY =================
+  // ================= PLAY MUSIC =================
   if (cmd === ",play") {
     const query = args.slice(1).join(" ");
-    if (!query) return message.reply("❌ Masukin lagu");
+    if (!query) return message.reply("❌ Masukin judul lagu");
 
     if (!connection)
       return message.reply("❌ Pake ,voice dulu");
@@ -67,10 +101,11 @@ client.on("messageCreate", async (message) => {
     try {
       let url = query;
 
+      // kalau bukan link → search
       if (!query.includes("youtube.com")) {
         const search = await play.search(query, { limit: 1 });
         if (!search.length)
-          return message.reply("❌ Ga ketemu");
+          return message.reply("❌ Lagu ga ketemu");
 
         url = search[0].url;
       }
@@ -82,39 +117,49 @@ client.on("messageCreate", async (message) => {
 
       player.play(resource);
 
-      message.reply(`▶️ ${url}`);
+      player.on(AudioPlayerStatus.Idle, () => {
+        // auto selesai (bisa nanti tambah queue)
+      });
+
+      return message.reply(`▶️ Playing: ${url}`);
     } catch (err) {
       console.log(err);
-      message.reply("❌ Error play");
+      return message.reply("❌ Error play lagu");
     }
   }
 
   // ================= AI =================
   if (cmd === ",ai") {
     const q = args.slice(1).join(" ");
-    if (!q) return message.reply("❌ Tanya apa?");
+    if (!q) return message.reply("❌ Tanya sesuatu");
 
     try {
-      message.reply("🔍 Nyari...");
+      await message.reply("🧠 Lagi mikir...");
 
-      const res = await axios.get(
-        `https://api.duckduckgo.com/?q=${encodeURIComponent(q)}&format=json`
-      );
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Kamu adalah AI pintar, santai, dan selalu menjawab dalam bahasa Indonesia dengan jelas dan mudah dipahami."
+          },
+          {
+            role: "user",
+            content: q
+          }
+        ]
+      });
 
-      if (res.data.Abstract) {
-        return message.reply(`🧠 ${res.data.Abstract}`);
-      }
+      const jawab = completion.choices[0].message.content;
 
-      if (res.data.RelatedTopics.length > 0) {
-        return message.reply(`🧠 ${res.data.RelatedTopics[0].Text}`);
-      }
-
-      message.reply("❌ Ai Tidak Menemukan jawaban");
+      return message.reply(jawab);
     } catch (err) {
       console.log(err);
-      message.reply("❌ AI error");
+      return message.reply("❌ Error AI (cek API KEY lu)");
     }
   }
 });
 
+// ================= LOGIN =================
 client.login(process.env.TOKEN);
