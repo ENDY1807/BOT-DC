@@ -3,11 +3,9 @@ require("dotenv").config();
 const { Client, GatewayIntentBits } = require("discord.js");
 const {
   joinVoiceChannel,
-  createAudioPlayer,
-  createAudioResource
+  createAudioPlayer
 } = require("@discordjs/voice");
 
-const play = require("play-dl");
 const axios = require("axios");
 
 const client = new Client({
@@ -23,125 +21,91 @@ let connection;
 let player = createAudioPlayer();
 
 client.once("ready", () => {
-  console.log(`✅ Bot aktif: ${client.user.tag}`);
+  console.log(`💖 Bot siap: ${client.user.tag}`);
 });
 
-client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
+// 🧠 PERSONALITY AI
+const personality = `
+Kamu adalah pasangan virtual yang perhatian, santai, dan sedikit manja.
+Gunakan bahasa Indonesia gaul (gue-lu).
+Panggil user dengan: sayang, beb, atau cinta.
+Jawaban harus natural, santai, dan tidak kaku.
+Kalau user sedih, hibur.
+Kalau user bercanda, ikut santai.
+Jangan terlalu panjang.
+`;
 
-  const args = message.content.split(" ");
-  const cmd = args[0].toLowerCase();
+// ================= VOICE =================
+client.on("messageCreate", async (msg) => {
+  if (msg.author.bot) return;
 
-  // ================= VOICE =================
-  if (cmd === ",voice") {
-    if (!message.member.voice.channel)
-      return message.reply("❌ Masuk VC dulu");
+  if (msg.content === ",sayang") {
+    const vc = msg.member.voice.channel;
 
-    connection = joinVoiceChannel({
-      channelId: message.member.voice.channel.id,
-      guildId: message.guild.id,
-      adapterCreator: message.guild.voiceAdapterCreator,
-      selfDeaf: true, // ❌ tidak deaf
-      selfMute: true   // ✅ mute saja
-    });
+    if (!vc) {
+      return msg.reply("❌ Masuk VC dulu beb 😏");
+    }
 
-    connection.subscribe(player);
-    return message.reply("✅ Masuk VC (mute)");
+    try {
+      connection = joinVoiceChannel({
+        channelId: vc.id,
+        guildId: msg.guild.id,
+        adapterCreator: msg.guild.voiceAdapterCreator,
+        selfDeaf: false,
+        selfMute: true
+      });
+
+      connection.subscribe(player);
+
+      msg.reply("💖 Aku temenin kamu di VC ya, sayang");
+
+    } catch (err) {
+      console.log(err);
+      msg.reply("❌ Gagal masuk VC");
+    }
   }
 
-  // ================= LEAVE =================
-  if (cmd === ",leave") {
+  if (msg.content === ",leave") {
     if (connection) {
       connection.destroy();
       connection = null;
-      return message.reply("👋 Keluar VC");
-    } else {
-      return message.reply("❌ Bot ga di VC");
+      msg.reply("👋 Aku pergi dulu ya...");
     }
   }
+});
 
-  // ================= PLAY =================
-  if (cmd === ",play") {
-    const query = args.slice(1).join(" ");
-    if (!query) return message.reply("❌ Masukin lagu");
+// ================= AI CHAT =================
+client.on("messageCreate", async (msg) => {
+  if (msg.author.bot) return;
 
-    if (!connection)
-      return message.reply("❌ Pake ,voice dulu");
+  // skip command
+  if (msg.content.startsWith(",")) return;
 
-    try {
-      let url = query;
-
-      // kalau bukan link → search
-      if (!query.includes("youtube.com")) {
-        const search = await play.search(query, { limit: 1 });
-        if (!search.length)
-          return message.reply("❌ Lagu ga ketemu");
-
-        url = search[0].url;
+  try {
+    const res = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: personality },
+          { role: "user", content: msg.content }
+        ],
+        max_tokens: 150
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${process.env.AI_KEY}`,
+          "Content-Type": "application/json"
+        }
       }
+    );
 
-      const stream = await play.stream(url);
-      const resource = createAudioResource(stream.stream, {
-        inputType: stream.type
-      });
+    const reply = res.data.choices[0].message.content;
+    msg.reply(reply);
 
-      player.play(resource);
-
-      return message.reply(`▶️ Playing: ${url}`);
-    } catch (err) {
-      console.log(err);
-      return message.reply("❌ Error play lagu");
-    }
-  }
-
-  // ================= AI =================
-  if (cmd === ",ai") {
-    const q = args.slice(1).join(" ");
-    if (!q) return message.reply("❌ Tanya apa?");
-
-    try {
-      await message.reply("🔍 Nyari...");
-
-      const res = await axios.get(
-        `https://api.duckduckgo.com/?q=${encodeURIComponent(q)}&format=json`
-      );
-
-      if (res.data.Abstract) {
-        return message.reply(`🧠 ${res.data.Abstract}`);
-      }
-
-      if (res.data.RelatedTopics.length > 0) {
-        return message.reply(`🧠 ${res.data.RelatedTopics[0].Text}`);
-      }
-
-      return message.reply("❌ Ga nemu jawaban");
-    } catch (err) {
-      console.log(err);
-      return message.reply("❌ AI error");
-    }
-  }
-
-  // ================= PING =================
-  if (cmd === ",ping") {
-    return message.reply("🏓 Pong!");
-  }
-
-  // ================= HELP =================
-  if (cmd === ",help") {
-    return message.reply(`
-🔥 COMMAND BOT 🔥
-
-🎵 MUSIC
-,voice → join VC (mute)
-,leave → keluar VC
-,play <lagu> → play lagu
-
-🧠 AI
-,ai <pertanyaan> → cari jawaban
-
-⚡ LAINNYA
-,ping → cek bot
-`);
+  } catch (err) {
+    console.log(err.response?.data || err.message);
+    msg.reply("❌ AI lagi error, coba lagi ya...");
   }
 });
 
